@@ -6,8 +6,11 @@
 %
 %    analyzeTexInstances(v, rois);
 %
-function analyzeTexInstances(v, rois)
+function rois = analyzeTexInstances(v, rois, varargin)
 
+getArgs(varargin, {'doZscore=0', 'useMean=0', 'texIdx', [1 2 3 4]}, 'verbose=1');
+
+% Parse args
 if ieNotDefined('v')
   v = newView;
   v = viewSet(v, 'curGroup', 'Concatenation');
@@ -35,10 +38,14 @@ stimNames = d.stimNames;
 texFams = unique(stimValues(1,:));
 %% Get the instances
 rois = getSortIndex(v, rois, r2);
-rois = getInstances(v,rois,d.stimvol, 'type=glm','canonicalType=allfit2', 'startLag=2','blockLen=15', 'n=200', 'r2cutoff=.1');
-
+if useMean
+  rois = getInstances(v, rois, d.stimvol, 'startLag=2','blockLen=15', 'n=200', 'r2cutoff=.1');
+else
+  rois = getInstances(v,rois, d.stimvol, 'type=glm','canonicalType=allfit2', 'n=200', 'r2cutoff=.1');
+end
+%keyboard
 %%
-corr_mtx = ER_getCorrMtx(rois, stimNames, stimValues, condNames);
+corr_mtx = ER_getCorrMtx(rois, stimNames, stimValues, condNames, 'doZscore', doZscore);
 %%
 corrs = ER_getCorrStruct(rois, stimValues, condNames, corr_mtx, 1);
 
@@ -52,8 +59,8 @@ imNames = stimfile.stimulus.imNames;
 roiNames = cellfun(@(x) x.name, rois, 'un', 0);
 plotCorrelations(corrs, roiNames, texFams, imNames);
 %%
-figure; for i = 1:6; subplot(3,2,i); cm = squeeze(corr_mtx(i,:,:)); imagesc(cm); caxis([-.5 1]); colorbar; end
-keyboard
+%figure; for i = 1:6; subplot(3,2,i); cm = squeeze(corr_mtx(i,:,:)); imagesc(cm); caxis([-.5 1]); colorbar; end
+%keyboard
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Function to get full correlation matrix
@@ -66,8 +73,7 @@ function corr_mtx = ER_getCorrMtx(rois, stimNames, stimValues, condNames, vararg
 %    - subtracted
 %    - useAvgTrace
 %    - texIdx   % whichsamples are textures (textures=1-4)
-getArgs(varargin, {'r2cutoff=.2', 'doZscore=1', 'nVoxels=[]', 'subtracted=1',...
-                   'useAvgTrace=0', 'texIdx', [1 2 3 4]}, 'verbose=1');
+getArgs(varargin, {'texIdx=[1 2 3 4]', 'r2cutoff=.2', 'doZscore=0', 'subtracted=1'}, 'verbose=1');
 
 % Extract conditions and values
 isTexture = arrayfun(@(x) any(x==texIdx), stimValues(2,:));
@@ -92,7 +98,7 @@ for ri = 1:length(rois)
     % Select whether to z-score, or just subtract the mean, or just divide by standard deviation.
     if doZscore==1
       zscoreFunc = @(x) (x-repmat(meanAmps, 1, size(x,2)))./repmat(stdAmps, 1, size(x,2));
-    elseif doZscore==2
+    elseif doZscore==2 % if doZscore=2, just substract the mean
       zscoreFunc = @(x) (x-repmat(meanAmps, 1, size(x,2)));
     elseif doZscore==3
       zscoreFunc = @(x) (x./repmat(stdAmps, 1, size(x,2)));
